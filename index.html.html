@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint Risk Predictor — ADO Velocity Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --surface: #131820;
+    --surface2: #1A2030;
+    --border: #1E2A3A;
+    --border-lit: #2A3A50;
+    --text: #D8E2EF;
+    --text-m: #7B8FA8;
+    --text-d: #3E5068;
+    --accent: #4EA8FF;
+    --accent-dim: #152640;
+    --green: #34D399;
+    --green-dim: #0D2E22;
+    --yellow: #FBBF24;
+    --yellow-dim: #2D2305;
+    --red: #F87171;
+    --red-dim: #2D1215;
+    --orange: #FB923C;
+    --purple: #A78BFA;
+    --purple-dim: #1A1530;
+    --font-display: 'Outfit', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 24px 28px;
+  }
+
+  /* ─── Header ─── */
+  .hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hdr-left { display: flex; align-items: center; gap: 14px; }
+  .hdr-logo {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: #fff;
+    box-shadow: 0 4px 20px rgba(78, 168, 255, 0.2);
+  }
+  .hdr h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
+  .hdr p { font-size: 12px; color: var(--text-m); margin-top: 2px; }
+  .hdr-actions { display: flex; gap: 8px; }
+
+  /* ─── Buttons ─── */
+  .btn {
+    font-family: var(--font-display);
+    font-size: 12px; font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-m);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { border-color: var(--border-lit); color: var(--text); background: var(--surface2); }
+  .btn-accent {
+    background: var(--accent-dim); border-color: rgba(78,168,255,0.3);
+    color: var(--accent);
+  }
+  .btn-accent:hover { background: rgba(78,168,255,0.15); }
+  .btn-red { background: var(--red-dim); border-color: rgba(248,113,113,0.3); color: var(--red); }
+  .btn-red:hover { background: rgba(248,113,113,0.15); }
+  .btn-green { background: var(--green-dim); border-color: rgba(52,211,153,0.3); color: var(--green); }
+  .btn-green:hover { background: rgba(52,211,153,0.15); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  /* ─── Team tabs ─── */
+  .team-bar {
+    display: flex; gap: 6px; margin-bottom: 20px;
+    overflow-x: auto; padding-bottom: 4px;
+  }
+  .team-tab {
+    font-family: var(--font-display);
+    font-size: 12px; font-weight: 500;
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-m);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    position: relative;
+  }
+  .team-tab:hover { color: var(--text); border-color: var(--border-lit); }
+  .team-tab.active {
+    background: var(--accent-dim);
+    border-color: rgba(78,168,255,0.4);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .team-tab .risk-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block; margin-left: 6px;
+    vertical-align: middle;
+  }
+  .team-add {
+    background: none; border: 1px dashed var(--border);
+    color: var(--text-d); font-size: 16px;
+    width: 34px; height: 34px; border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .team-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ─── Cards ─── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .card-label {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-d);
+    margin-bottom: 10px;
+  }
+
+  /* ─── Inputs ─── */
+  .input {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    padding: 8px 12px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .input:focus { border-color: var(--accent); }
+  .input-lg { font-size: 22px; font-weight: 700; padding: 10px 14px; }
+  .input-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-d); margin-bottom: 5px;
+  }
+
+  /* ─── Layout grids ─── */
+  .top-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .main-grid { display: grid; grid-template-columns: 290px 1fr; gap: 16px; margin-bottom: 18px; }
+  .left-stack { display: flex; flex-direction: column; gap: 14px; }
+  .right-stack { display: flex; flex-direction: column; gap: 14px; }
+  .pred-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  /* ─── Gauge ─── */
+  .gauge-wrap { text-align: center; padding: 8px 0; }
+  .risk-label {
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 500;
+    margin-top: 4px;
+  }
+
+  /* ─── Factor list ─── */
+  .factor-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 6px 0;
+  }
+  .factor-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-top: 5px; flex-shrink: 0;
+  }
+  .factor-text { font-size: 12px; color: var(--text-m); line-height: 1.45; }
+
+  /* ─── Stats ─── */
+  .stat-num {
+    font-family: var(--font-mono);
+    font-size: 22px; font-weight: 500;
+    color: var(--accent);
+  }
+  .stat-sub { font-size: 11px; color: var(--text-d); margin-top: 2px; }
+  .stat-row { margin-bottom: 12px; }
+
+  /* ─── Chart ─── */
+  .chart-legend {
+    display: flex; gap: 16px; font-size: 10px; color: var(--text-d);
+  }
+  .chart-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-line { width: 18px; height: 2px; border-radius: 1px; }
+
+  /* ─── Table ─── */
+  .sprint-table { width: 100%; border-collapse: collapse; }
+  .sprint-table th {
+    text-align: left; padding: 8px 10px;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-d);
+    border-bottom: 1px solid var(--border);
+  }
+  .sprint-table td {
+    padding: 10px 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    border-bottom: 1px solid rgba(30,42,58,0.4);
+  }
+  .sprint-table tr:hover td { background: rgba(78,168,255,0.03); }
+  .pct-bar-track {
+    width: 56px; height: 5px;
+    background: var(--border); border-radius: 3px;
+    overflow: hidden; display: inline-block; vertical-align: middle;
+    margin-right: 8px;
+  }
+  .pct-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .remove-btn {
+    background: none; border: none; color: var(--text-d);
+    cursor: pointer; font-size: 15px; padding: 2px 6px; border-radius: 4px;
+    transition: color 0.2s;
+  }
+  .remove-btn:hover { color: var(--red); }
+
+  /* ─── Add sprint form ─── */
+  .add-form {
+    display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr auto;
+    gap: 8px; margin-bottom: 14px; align-items: end;
+  }
+
+  /* ─── Prediction card ─── */
+  .pred-val {
+    font-family: var(--font-mono);
+    font-size: 28px; font-weight: 500;
+  }
+  .pred-unit { font-size: 12px; color: var(--text-d); font-weight: 400; }
+  .pred-sub { font-size: 11px; color: var(--text-d); margin-top: 4px; }
+  .overrun-badge {
+    display: inline-block; margin-top: 8px;
+    font-size: 11px; padding: 3px 9px;
+    border-radius: 5px;
+    background: var(--red-dim); color: var(--red);
+    font-family: var(--font-mono);
+  }
+
+  /* ─── Tip box ─── */
+  .tip-box {
+    background: var(--purple-dim);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; gap: 12px; align-items: flex-start;
+    font-size: 12px; color: var(--text-m); line-height: 1.6;
+  }
+  .tip-box strong { color: var(--purple); }
+  .tip-box code {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--text); background: rgba(255,255,255,0.05);
+    padding: 1px 5px; border-radius: 3px;
+  }
+
+  /* ─── Modal ─── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; backdrop-filter: blur(4px);
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px; width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+
+  /* ─── Mini bar ─── */
+  .mini-bars { display: flex; align-items: flex-end; gap: 4px; height: 70px; }
+  .mini-bar {
+    border-radius: 3px 3px 0 0;
+    min-height: 3px;
+    transition: height 0.4s ease;
+    background: var(--accent);
+  }
+
+  /* ─── Animations ─── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.5s ease both; }
+  .fade-up-1 { animation-delay: 0.05s; }
+  .fade-up-2 { animation-delay: 0.1s; }
+  .fade-up-3 { animation-delay: 0.15s; }
+  .fade-up-4 { animation-delay: 0.2s; }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .pred-cards { grid-template-columns: 1fr; }
+    .add-form { grid-template-columns: 1fr 1fr; }
+    .top-inputs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell" id="app"></div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  DATA & STATE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const STORAGE_KEY = 'ado-sprint-risk-v2';
+
+const DEFAULT_TEAMS = [
+  {
+    id: 't1', name: 'Platform',
+    remainingWork: 120, targetSprints: 5,
+    sprints: [
+      { id: 1, name: 'Sprint 1', planned: 34, completed: 30, carryOver: 4 },
+      { id: 2, name: 'Sprint 2', planned: 36, completed: 28, carryOver: 8 },
+      { id: 3, name: 'Sprint 3', planned: 32, completed: 31, carryOver: 1 },
+      { id: 4, name: 'Sprint 4', planned: 38, completed: 26, carryOver: 12 },
+      { id: 5, name: 'Sprint 5', planned: 30, completed: 29, carryOver: 1 },
+    ]
+  },
+  {
+    id: 't2', name: 'Mobile',
+    remainingWork: 85, targetSprints: 4,
+    sprints: [
+      { id: 1, name: 'Sprint 1', planned: 28, completed: 26, carryOver: 2 },
+      { id: 2, name: 'Sprint 2', planned: 30, completed: 24, carryOver: 6 },
+      { id: 3, name: 'Sprint 3', planned: 26, completed: 25, carryOver: 1 },
+    ]
+  }
+];
+
+let state = {
+  teams: DEFAULT_TEAMS,
+  activeTeamId: 't1',
+  showAddSprint: false,
+  showAddTeam: false,
+  newTeamName: '',
+  newSprint: { name: '', planned: '', completed: '', carryOver: '' },
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved.teams && saved.teams.length) {
+        state.teams = saved.teams;
+        state.activeTeamId = saved.activeTeamId || saved.teams[0].id;
+      }
+    }
+  } catch(e) {}
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      teams: state.teams,
+      activeTeamId: state.activeTeamId
+    }));
+  } catch(e) {}
+}
+
+function getActiveTeam() {
+  return state.teams.find(t => t.id === state.activeTeamId) || state.teams[0];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  CALCULATION ENGINE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function calcStats(sprints) {
+  if (!sprints.length) return { avg: 0, stdDev: 0, trend: 0, velocities: [] };
+  const v = sprints.map(s => s.completed);
+  const avg = v.reduce((a, b) => a + b, 0) / v.length;
+  const variance = v.reduce((sum, x) => sum + (x - avg) ** 2, 0) / v.length;
+  const stdDev = Math.sqrt(variance);
+  let trend = 0;
+  if (v.length >= 2) {
+    const recent = v.slice(-3);
+    trend = recent.reduce((a, b) => a + b, 0) / recent.length - avg;
+  }
+  return { avg, stdDev, trend, velocities: v };
+}
+
+function predict(remaining, stats, target) {
+  const { avg, stdDev, trend } = stats;
+  const projected = Math.max(1, avg + trend * 0.5);
+  const optimistic = Math.max(1, avg + stdDev);
+  const pessimistic = Math.max(1, avg - stdDev);
+  const best = Math.ceil(remaining / optimistic);
+  const likely = Math.ceil(remaining / projected);
+  const worst = Math.ceil(remaining / pessimistic);
+  const burndown = [];
+  for (let i = 1; i <= Math.max(target, worst + 2); i++) {
+    burndown.push({
+      sprint: i,
+      best: Math.max(0, remaining - optimistic * i),
+      likely: Math.max(0, remaining - projected * i),
+      worst: Math.max(0, remaining - pessimistic * i),
+    });
+    if (remaining - pessimistic * i <= 0) break;
+  }
+  return { best, likely, worst, projected, optimistic, pessimistic, burndown };
+}
+
+function riskScore(sprints, remaining, target) {
+  const stats = calcStats(sprints);
+  const pred = predict(remaining, stats, target);
+  let score = 0;
+  const factors = [];
+
+  if (pred.likely > target) {
+    score += Math.min(40, ((pred.likely - target) / target) * 100);
+    factors.push({ text: `Likely ${pred.likely - target} sprint(s) over target`, sev: 'high' });
+  }
+  const cv = stats.avg > 0 ? (stats.stdDev / stats.avg) * 100 : 0;
+  if (cv > 25) { score += 20; factors.push({ text: `${cv.toFixed(0)}% velocity variance — unpredictable`, sev: 'high' }); }
+  else if (cv > 15) { score += 10; factors.push({ text: `${cv.toFixed(0)}% velocity variance — moderate`, sev: 'med' }); }
+
+  if (stats.trend < -2) { score += 20; factors.push({ text: `Velocity declining ${Math.abs(stats.trend).toFixed(1)} pts/sprint`, sev: 'high' }); }
+  else if (stats.trend < 0) { score += 8; factors.push({ text: `Slight downward trend (${stats.trend.toFixed(1)} pts)`, sev: 'med' }); }
+
+  const recent = sprints.slice(-3);
+  if (recent.length) {
+    const avgCO = recent.reduce((a, s) => a + s.carryOver, 0) / recent.length;
+    const avgPl = recent.reduce((a, s) => a + s.planned, 0) / recent.length;
+    if (avgPl > 0 && avgCO / avgPl > 0.2) { score += 15; factors.push({ text: `${(avgCO/avgPl*100).toFixed(0)}% carry-over rate — scope not completing`, sev: 'high' }); }
+    else if (avgPl > 0 && avgCO / avgPl > 0.1) { score += 7; factors.push({ text: `${(avgCO/avgPl*100).toFixed(0)}% carry-over rate`, sev: 'med' }); }
+  }
+  if (pred.best > target) { score += 25; factors.push({ text: 'Even best-case misses the deadline', sev: 'crit' }); }
+  if (!factors.length) factors.push({ text: 'On track — velocity supports the timeline', sev: 'low' });
+
+  return { score: Math.min(100, Math.round(score)), factors, pred, stats };
+}
+
+function riskMeta(score) {
+  if (score >= 75) return { label: 'High Risk', color: 'var(--red)', bg: 'var(--red-dim)', icon: '▲' };
+  if (score >= 40) return { label: 'Medium Risk', color: 'var(--yellow)', bg: 'var(--yellow-dim)', icon: '◆' };
+  return { label: 'Low Risk', color: 'var(--green)', bg: 'var(--green-dim)', icon: '●' };
+}
+
+function teamRiskColor(team) {
+  const r = riskScore(team.sprints, team.remainingWork, team.targetSprints);
+  return riskMeta(r.score).color;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  SVG RENDERERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function renderGauge(score) {
+  const m = riskMeta(score);
+  const dash = (score / 100) * 173;
+  return `
+    <div class="gauge-wrap">
+      <svg width="150" height="95" viewBox="0 0 150 95">
+        <defs>
+          <linearGradient id="gG" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="var(--green)"/>
+            <stop offset="50%" stop-color="var(--yellow)"/>
+            <stop offset="100%" stop-color="var(--red)"/>
+          </linearGradient>
+        </defs>
+        <path d="M 15 82 A 58 58 0 1 1 135 82" fill="none" stroke="var(--border)" stroke-width="11" stroke-linecap="round"/>
+        <path d="M 15 82 A 58 58 0 1 1 135 82" fill="none" stroke="url(#gG)" stroke-width="11" stroke-linecap="round"
+          stroke-dasharray="${dash} 183" style="transition:stroke-dasharray 0.8s ease"/>
+        <text x="75" y="68" text-anchor="middle" fill="${m.color}" font-size="30" font-weight="700" font-family="var(--font-mono)">${score}</text>
+        <text x="75" y="86" text-anchor="middle" fill="var(--text-d)" font-size="11">/ 100</text>
+      </svg>
+      <div class="risk-label" style="color:${m.color}">${m.icon} ${m.label}</div>
+    </div>`;
+}
+
+function renderChart(burndown, target, remaining) {
+  if (!burndown.length) return '<div style="color:var(--text-d);text-align:center;padding:40px">Add sprint data to see projections</div>';
+  const W = 520, H = 180;
+  const pad = { t: 12, r: 20, b: 28, l: 48 };
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+  const maxY = remaining * 1.05;
+  const xS = i => pad.l + (i / (burndown.length - 1 || 1)) * cW;
+  const yS = v => pad.t + cH - (Math.max(0, v) / maxY) * cH;
+
+  const pts = key => burndown.map((b, i) => `${i === 0 ? 'M' : 'L'}${xS(i).toFixed(1)},${yS(b[key]).toFixed(1)}`).join(' ');
+
+  // Confidence area
+  const areaUp = burndown.map((b, i) => `${i === 0 ? 'M' : 'L'}${xS(i).toFixed(1)},${yS(b.best).toFixed(1)}`).join(' ');
+  const areaDn = burndown.slice().reverse().map((b, i) => `L${xS(burndown.length - 1 - i).toFixed(1)},${yS(b.worst).toFixed(1)}`).join(' ');
+
+  // Grid
+  let grid = '';
+  for (let f = 0; f <= 1; f += 0.25) {
+    const y = pad.t + cH * (1 - f);
+    const val = Math.round(maxY * f);
+    grid += `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="var(--border)" stroke-width="0.5"/>`;
+    grid += `<text x="${pad.l - 7}" y="${y + 4}" fill="var(--text-d)" font-size="9" text-anchor="end" font-family="var(--font-mono)">${val}</text>`;
+  }
+  // Sprint labels
+  let labels = '';
+  burndown.forEach((_, i) => {
+    labels += `<text x="${xS(i)}" y="${H - 6}" fill="var(--text-d)" font-size="9" text-anchor="middle" font-family="var(--font-mono)">S+${i + 1}</text>`;
+  });
+  // Target line
+  let targetLine = '';
+  if (target <= burndown.length) {
+    const tx = xS(target - 1);
+    targetLine = `
+      <line x1="${tx}" y1="${pad.t}" x2="${tx}" y2="${pad.t + cH}" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <text x="${tx}" y="${pad.t - 3}" fill="var(--red)" font-size="8" text-anchor="middle" font-weight="600" font-family="var(--font-mono)">TARGET</text>`;
+  }
+  // Dots on likely
+  const dots = burndown.map((b, i) => `<circle cx="${xS(i)}" cy="${yS(b.likely)}" r="3" fill="var(--accent)"/>`).join('');
+
+  return `
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="display:block">
+      ${grid}${labels}${targetLine}
+      <line x1="${pad.l}" y1="${yS(0)}" x2="${W - pad.r}" y2="${yS(0)}" stroke="var(--border-lit)" stroke-width="1"/>
+      <path d="${areaUp}${areaDn}Z" fill="var(--accent)" opacity="0.06"/>
+      <path d="${pts('worst')}" fill="none" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+      <path d="${pts('likely')}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <path d="${pts('best')}" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+      ${dots}
+    </svg>`;
+}
+
+function renderMiniBars(velocities) {
+  if (!velocities.length) return '';
+  const max = Math.max(...velocities) * 1.2;
+  const bw = Math.max(8, Math.floor(140 / velocities.length) - 4);
+  return `<div class="mini-bars">${velocities.map((v, i) =>
+    `<div class="mini-bar" style="width:${bw}px;height:${(v / max * 100).toFixed(1)}%;opacity:${(0.4 + (i / velocities.length) * 0.6).toFixed(2)}"></div>`
+  ).join('')}</div>`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  RENDER
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function render() {
+  const team = getActiveTeam();
+  if (!team) return;
+  const analysis = riskScore(team.sprints, team.remainingWork, team.targetSprints);
+  const { score, factors, pred, stats } = analysis;
+  const rm = riskMeta(score);
+
+  const sevColor = s => s === 'crit' ? 'var(--red)' : s === 'high' ? 'var(--orange)' : s === 'med' ? 'var(--yellow)' : 'var(--green)';
+
+  const predCards = [
+    { label: 'Best Case', val: pred.best, vel: pred.optimistic, color: 'var(--green)' },
+    { label: 'Likely', val: pred.likely, vel: pred.projected, color: 'var(--accent)' },
+    { label: 'Worst Case', val: pred.worst, vel: pred.pessimistic, color: 'var(--red)' },
+  ];
+
+  document.getElementById('app').innerHTML = `
+    <!-- HEADER -->
+    <div class="hdr fade-up">
+      <div class="hdr-left">
+        <div class="hdr-logo">R</div>
+        <div>
+          <h1>Sprint Risk Predictor</h1>
+          <p>Velocity-based completion forecast & early risk detection</p>
+        </div>
+      </div>
+      <div class="hdr-actions">
+        <button class="btn" onclick="exportData()">↓ Export</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()">↑ Import</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+
+    <!-- TEAM TABS -->
+    <div class="team-bar fade-up fade-up-1">
+      ${state.teams.map(t => `
+        <button class="team-tab ${t.id === state.activeTeamId ? 'active' : ''}" onclick="switchTeam('${t.id}')">
+          ${t.name}
+          <span class="risk-dot" style="background:${teamRiskColor(t)}"></span>
+        </button>
+      `).join('')}
+      <button class="team-add" onclick="showAddTeam()" title="Add team">+</button>
+    </div>
+
+    <!-- TOP INPUTS -->
+    <div class="top-inputs fade-up fade-up-2">
+      <div class="card">
+        <div class="input-label">Remaining Backlog (Story Points)</div>
+        <input class="input input-lg" type="number" value="${team.remainingWork}"
+          onchange="updateTeam('remainingWork', +this.value)">
+      </div>
+      <div class="card">
+        <div class="input-label">Target Sprints to Complete</div>
+        <input class="input input-lg" type="number" value="${team.targetSprints}"
+          onchange="updateTeam('targetSprints', Math.max(1, +this.value))">
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="main-grid fade-up fade-up-3">
+      <!-- LEFT -->
+      <div class="left-stack">
+        <div class="card">
+          <div class="card-label">Risk Assessment</div>
+          ${renderGauge(score)}
+        </div>
+        <div class="card">
+          <div class="card-label">Risk Factors</div>
+          ${factors.map(f => `
+            <div class="factor-row">
+              <div class="factor-dot" style="background:${sevColor(f.sev)}"></div>
+              <div class="factor-text">${f.text}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card">
+          <div class="card-label">Velocity Stats</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end">
+            <div>
+              <div class="stat-row">
+                <div class="stat-sub">Average</div>
+                <div class="stat-num">${stats.avg.toFixed(1)}</div>
+              </div>
+              <div class="stat-row">
+                <div class="stat-sub">Std Dev</div>
+                <div style="font-family:var(--font-mono);font-size:16px;font-weight:500">±${stats.stdDev.toFixed(1)}</div>
+              </div>
+              <div class="stat-row" style="margin-bottom:0">
+                <div class="stat-sub">Trend</div>
+                <div style="font-family:var(--font-mono);font-size:16px;font-weight:500;color:${stats.trend >= 0 ? 'var(--green)' : 'var(--red)'}">
+                  ${stats.trend >= 0 ? '+' : ''}${stats.trend.toFixed(1)}
+                </div>
+              </div>
+            </div>
+            ${renderMiniBars(stats.velocities)}
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="right-stack">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="card-label" style="margin-bottom:0">Completion Projection</div>
+            <div class="chart-legend">
+              <span><div class="legend-line" style="background:var(--green)"></div>Best</span>
+              <span><div class="legend-line" style="background:var(--accent)"></div>Likely</span>
+              <span><div class="legend-line" style="background:var(--red)"></div>Worst</span>
+            </div>
+          </div>
+          ${renderChart(pred.burndown, team.targetSprints, team.remainingWork)}
+        </div>
+
+        <div class="pred-cards">
+          ${predCards.map(c => `
+            <div class="card" style="border-color:${c.val > team.targetSprints ? 'rgba(248,113,113,0.3)' : 'var(--border)'}">
+              <div class="card-label">${c.label}</div>
+              <div class="pred-val" style="color:${c.color}">${c.val}<span class="pred-unit"> sprints</span></div>
+              <div class="pred-sub">@ ${c.vel.toFixed(1)} pts/sprint</div>
+              ${c.val > team.targetSprints ? `<div class="overrun-badge">+${c.val - team.targetSprints} over target</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- SPRINT TABLE -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="card-label" style="margin-bottom:0">Sprint History — ${team.name}</div>
+            <div style="display:flex;gap:8px">
+              ${state.activeTeamId !== state.teams[0]?.id && state.teams.length > 1 ? `<button class="btn btn-sm btn-red" onclick="removeTeam()">Remove Team</button>` : ''}
+              <button class="btn btn-sm ${state.showAddSprint ? 'btn-red' : 'btn-accent'}" onclick="toggleAddSprint()">
+                ${state.showAddSprint ? 'Cancel' : '+ Add Sprint'}
+              </button>
+            </div>
+          </div>
+
+          ${state.showAddSprint ? `
+          <div class="add-form">
+            <div>
+              <div class="input-label">Name</div>
+              <input class="input" placeholder="Sprint name" id="ns-name" value="${state.newSprint.name}">
+            </div>
+            <div>
+              <div class="input-label">Planned</div>
+              <input class="input" type="number" placeholder="0" id="ns-planned" value="${state.newSprint.planned}">
+            </div>
+            <div>
+              <div class="input-label">Completed</div>
+              <input class="input" type="number" placeholder="0" id="ns-completed" value="${state.newSprint.completed}">
+            </div>
+            <div>
+              <div class="input-label">Carry-over</div>
+              <input class="input" type="number" placeholder="0" id="ns-carryover" value="${state.newSprint.carryOver}">
+            </div>
+            <button class="btn btn-green" style="height:33px;align-self:end" onclick="addSprint()">Add</button>
+          </div>` : ''}
+
+          <div style="overflow-x:auto">
+            <table class="sprint-table">
+              <thead>
+                <tr>
+                  <th>Sprint</th><th>Planned</th><th>Completed</th><th>Carry-Over</th><th>Completion</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${team.sprints.length ? team.sprints.map(s => {
+                  const pct = s.planned > 0 ? Math.round(s.completed / s.planned * 100) : 0;
+                  const pctColor = pct >= 90 ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : 'var(--red)';
+                  return `<tr>
+                    <td style="font-weight:500">${s.name}</td>
+                    <td>${s.planned}</td>
+                    <td style="color:var(--accent)">${s.completed}</td>
+                    <td style="color:${s.carryOver > 5 ? 'var(--red)' : 'var(--text-m)'}">${s.carryOver}</td>
+                    <td>
+                      <div class="pct-bar-track"><div class="pct-bar-fill" style="width:${pct}%;background:${pctColor}"></div></div>
+                      <span style="font-size:11px;color:${pctColor}">${pct}%</span>
+                    </td>
+                    <td><button class="remove-btn" onclick="removeSprint(${s.id})">×</button></td>
+                  </tr>`;
+                }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-d);padding:24px;font-family:var(--font-display)">No sprints yet — add your first sprint above</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIP -->
+    <div class="tip-box fade-up fade-up-4">
+      <span style="font-size:18px">💡</span>
+      <div>
+        <strong>ADO Integration:</strong> Export velocity from <code>Boards → Sprints → Velocity</code>. 
+        Or automate with the REST API: <code>_apis/work/teamsettings/iterations</code> to pull sprint data. 
+        Host this page on Azure Static Web Apps (free tier) and embed via the <strong>Embedded Webpage</strong> dashboard widget. 
+        Use Export/Import buttons above to share data across teams.
+      </div>
+    </div>
+
+    <!-- ADD TEAM MODAL -->
+    ${state.showAddTeam ? `
+    <div class="modal-overlay" onclick="if(event.target===this){state.showAddTeam=false;render()}">
+      <div class="modal">
+        <h3>Add Team</h3>
+        <div class="input-label">Team Name</div>
+        <input class="input" id="new-team-name" placeholder="e.g. Backend, QA, DevOps" autofocus
+          onkeydown="if(event.key==='Enter')addTeam()">
+        <div class="modal-actions">
+          <button class="btn" onclick="state.showAddTeam=false;render()">Cancel</button>
+          <button class="btn btn-accent" onclick="addTeam()">Create Team</button>
+        </div>
+      </div>
+    </div>` : ''}
+  `;
+
+  // Focus modal input
+  if (state.showAddTeam) {
+    setTimeout(() => document.getElementById('new-team-name')?.focus(), 50);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ACTIONS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function switchTeam(id) {
+  state.activeTeamId = id;
+  state.showAddSprint = false;
+  saveState(); render();
+}
+
+function showAddTeam() {
+  state.showAddTeam = true;
+  render();
+}
+
+function addTeam() {
+  const name = document.getElementById('new-team-name')?.value?.trim();
+  if (!name) return;
+  const id = 't' + Date.now();
+  state.teams.push({ id, name, remainingWork: 100, targetSprints: 5, sprints: [] });
+  state.activeTeamId = id;
+  state.showAddTeam = false;
+  saveState(); render();
+}
+
+function removeTeam() {
+  if (!confirm(`Remove team "${getActiveTeam().name}" and all its data?`)) return;
+  state.teams = state.teams.filter(t => t.id !== state.activeTeamId);
+  state.activeTeamId = state.teams[0]?.id || '';
+  saveState(); render();
+}
+
+function updateTeam(key, value) {
+  const team = getActiveTeam();
+  if (team) { team[key] = value; saveState(); render(); }
+}
+
+function toggleAddSprint() {
+  state.showAddSprint = !state.showAddSprint;
+  state.newSprint = { name: '', planned: '', completed: '', carryOver: '' };
+  render();
+}
+
+function addSprint() {
+  const team = getActiveTeam();
+  const planned = parseInt(document.getElementById('ns-planned')?.value);
+  const completed = parseInt(document.getElementById('ns-completed')?.value);
+  if (!planned && planned !== 0) return;
+  if (!completed && completed !== 0) return;
+  const name = document.getElementById('ns-name')?.value?.trim() || `Sprint ${team.sprints.length + 1}`;
+  const carryOver = parseInt(document.getElementById('ns-carryover')?.value) || 0;
+  team.sprints.push({ id: Date.now(), name, planned, completed, carryOver });
+  state.showAddSprint = false;
+  saveState(); render();
+}
+
+function removeSprint(id) {
+  const team = getActiveTeam();
+  team.sprints = team.sprints.filter(s => s.id !== id);
+  saveState(); render();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify({ teams: state.teams, exported: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sprint-risk-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.teams && Array.isArray(data.teams)) {
+        state.teams = data.teams;
+        state.activeTeamId = data.teams[0]?.id || '';
+        saveState(); render();
+      }
+    } catch(err) { alert('Invalid file format'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  INIT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+loadState();
+render();
+</script>
+</body>
+</html>
